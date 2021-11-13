@@ -1,84 +1,74 @@
 import json
 import boto3
 import logging
+import os
 from nacl.signing import VerifyKey
 from nacl.exceptions import BadSignatureError
 
-publicKeySSMName = '/discord/discordApiBotPublicKey'
-commandApiArnSSMName = '/discord/discordCommandLambdaArn'
-
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
+apiBotPublicKey = os.environ['BOTPUBLICKEY']
+commandsApiArn = os.environ['COMMANDAPIARN']
+
 
 def lambda_handler(event, context):
-  """This is the frontend for our discord bot.  Handles discords security verifying, and hands off the event to our command backend.  It's required to respond within 3 seconds or else discord considers it a failed response.
+    """This lambda function handles Discord authentication requests from them.  It verifies their key, and responds to ping and Interactions from our bot.  Discord has a limitation that we must respond in 3 seconds, due to this if it is a command we will pass back a temporary value so that our bot "thinks about it" and then the command backend will update it.
 
-  Args:
-      event (json): The lambda event, it's transformed by the api with a mapping template so that we can verify the signature properly.
-      context (json): Passed in by AWS
 
-  Raises:
-      Exception: When the verify signature fails.  It will send a 401 when the API gateway receives it.
+    Args:
+        event (json): The event json that is passed in from the api gateway.
+        context (json): The context that is passed in from the api gateway.
 
-  Returns:
-      [json]: Returns a type 5 response; to discord this means "I acknowledge your message, and will send a response later".
-  """
-  logger.info('## EVENT')
-  logger.info('##NOEVENT')
-  # logger.info(event)
+    Raises:
+        Exception: Throws an exception if the signature is bad, and sends Discord a 401 error.  This is required for discord's authentication as they will send bad auth requests to test it.
 
-  (apiBotPublicKey,commandsApiArn) = GetSSMParams()
+    Returns:
+        json: The response that we will send back through to the sender
+    """
+    logger.info('## EVENT')
+    logger.info(event)
+    logger.info('## Context')
+    logger.info(context)
 
-  try:
-    VerifySignature(event, apiBotPublicKey)
-  except BadSignatureError:
-      return {
-        'statusCode': 401,
-        'body': json.dumps('invalid request signature')
-      }
-  except Exception as e:
-    raise Exception(f"Unverified, there was an issue verifying the signature. {e}")
-  
-  if(HandleDiscordPing(event)):
-    return {
+    try:
+        VerifySignature(event, apiBotPublicKey)
+    except BadSignatureError:
+        return {
+            'statusCode': 401,
+            'body': "Invalid Signature"
+        }
+
+    if(HandleDiscordPing(event)):
+        return {
+            'statusCode': 200,
+            'body': json.dumps({
+                'type': 1
+            })
+        }
+    successfulResponse = {
         'statusCode': 200,
         'body': json.dumps({
-          'type': 1
+            'type': 5,
         })
-      }
-    # return {"type": 1}
-  response =     {
-      'statusCode': 200,
-      'body': json.dumps({
-        'type': 4,
-        'data': {
-          'content': 'Hello, World.',
-        }
-      })
     }
-  # response =   {"type": 5}
+    lambdaData = json.dumps(event.get('body'))
+    InvokeDiscordCommandsApi(lambdaData, commandsApiArn)
+    return successfulResponse
 
-  logger.info('## RESPONSE')
-  logger.info(response)
 
-  lambdaData = json.dumps(event.get('body'))
-  InvokeDiscordCommandsApi(lambdaData, commandsApiArn)
-  return response
+def VerifySignature(event, botPublicKey):
+    """Verifies the signature from the request.  This happens from discords servers occasionally and from each request to see if the request should be processed.  We are required to send an unauthorized 401 if this fails.
 
-def InvokeDiscordCommandsApi(payloadData, lambdaToInvokeArn):
-  """Invokes our lambda commands API to handle the command asyncronously so that we don't time out, and send the token and the command with it.
-
-  Args:
-      payloadData (json): The json that should be sent to the lambda function to parse through and handle the command.  Needs the token for the interaction and the actual command that was sent at the minimum.
-
-      lambdaToInvokeArn (string): The lambda function that should be invoked
-
-  """
-  lambdaClient = boto3.client('lambda')
-  lambdaClient.invoke(
-    FunctionName=lambdaToInvokeArn,
-    InvocationType='Event',
-    Payload=payloadData)
+    Args:
+        event (dict): The full raw body from the event as we need the headers and the body
+        botPublicKey (string): The bots public key
+    """
+    signature = event['headers']['x-signature-ed25519']
+    timestamp = event['headers']['x-signature-timestamp']
+    body = event['body']
+    message = (timestamp + body).encode()
+    verify_key = VerifyKey(bytes.fromhex(botPublicKey))
+    verify_key.verify(message, bytes.fromhex(signature))
 
 def HandleDiscordPing(body):
     """This handles the pings that the discord api automatically sends frequently to this endpoint for testing
@@ -94,42 +84,19 @@ def HandleDiscordPing(body):
     return False
 
 
-def VerifySignature(event, botPublicKey):
-  """Tries to verify the signature that discord sends frequently to test your endpoint.  This needs an event that was transformed properly by the api gateway as we need the full rawbody to get some of the event to parse, which isn't included otherwise.  This throws an exception if verifykey fails.
+def InvokeDiscordCommandsApi(payloadData, lambdaToInvokeArn):
+    """Invokes our lambda commands API to handle the command asyncronously so that we don't time out, and send the token and the command with it.
 
-  Args:
-      event (json): the transformed event from the API gateway so that we can get the output to parse
+    Args:
+        payloadData (json): The json that should be sent to the lambda function to parse through and handle the command.  Needs the token for the interaction and the actual command that was sent at the minimum.
 
-      botPublicKey (string): The front end bots public key so that we can verify the signature with it.
-  """
-  signature = event['headers']['x-signature-ed25519']
-  timestamp = event['headers']['x-signature-timestamp']
-  body = event['body']
-  message = timestamp.encode() + body.encode()
-  verify_key = VerifyKey(bytes.fromhex(botPublicKey))
-  logger.info(verify_key)
-  verify_key.verify(message, bytes.fromhex(signature))
-  # raw_body = json.dumps(event)
-  # message = timestamp.encode() + raw_body.encode()
-  # verify_key = VerifyKey(bytes.fromhex(botPublicKey))
-  # verify_key.verify(message, bytes.fromhex(signature))
+        lambdaToInvokeArn (string): The lambda function that should be invoked
 
-def GetSSMParams():
-  """Gets the SSM parameters from the store and returns them.
-
-  Returns:
-      Both of the parameters as a tuple
-  """
-  ssm = boto3.client('ssm')
-  ssmParams = ssm.get_parameters(
-  Names=[
-    publicKeySSMName,
-    commandApiArnSSMName
-  ],
-  WithDecryption=True
-)
-  logger.info(ssmParams )
-  return ssmParams.get('Parameters')[0].get('Value'), ssmParams.get('Parameters')[1].get('Value')
-
+    """
+    lambdaClient = boto3.client('lambda')
+    lambdaClient.invoke(
+        FunctionName=lambdaToInvokeArn,
+        InvocationType='Event',
+        Payload=payloadData)
 
 

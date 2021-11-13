@@ -2,9 +2,11 @@ version = 0.1
 [default]
 [default.deploy]
 [default.deploy.parameters]
-stack_name = "sam-app"
+stack_name = "discord-api"
 s3_bucket = "aws-sam-cli-managed-default-samclisourcebucket-13yrmrvap3arl"
-s3_prefix = "sam-app"
+s3_prefix = "discord-api"
 region = "us-east-2"
 capabilities = "CAPABILITY_IAM"
-image_repositories = ["HelloWorldFunction=145035066069.dkr.ecr.us-east-2.amazonaws.com/samapp7427b055/helloworldfunction19d43fc4repo", "DiscordSlashBot=145035066069.dkr.ecr.us-east-2.amazonaws.com/samapp7427b055/discordslashbotcad6eb77repo"]
+parameter_overrides = "ApiDomainName=\"discord.supergoon.com\" CertificateArn=\"/discord/discordStarCert\" SlashBotPublicKey=\"/discord/discordApiBotPublicKey\" Route53HostedZone=\"/globals/supergoonRoute53HostedZoneId\" GetValuesFromTableLambdaArn=\"/jrpg/getVoteValuesLambdaArn\""
+image_repositories = ["DiscordSlashBot=145035066069.dkr.ecr.us-east-2.amazonaws.com/discordapi249d173d/discordslashbotcad6eb77repo", "DiscordSlashBotCommands=145035066069.dkr.ecr.us-east-2.amazonaws.com/discordapi249d173d/discordslashbotcommandsc6c69987repo"]
+disable_rollback = true

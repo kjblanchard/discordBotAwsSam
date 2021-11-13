@@ -2,58 +2,97 @@ AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: >
   python3.9
+  SAM template for a Discord Bot with multiple components.
 
-  Sample SAM Template for sam-app
-
-# More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
 Globals:
   Function:
     Timeout: 3
+    Tags:
+      owner: discordSamApi
+
+Parameters:
+  ApiDomainName:
+    Type: String
+    Description: The Domain name that your API will use.
+  CertificateArn:
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: /discord/discordStarCert
+    Description: The * certificate for your API.  This should be made beforehand.
+  SlashBotPublicKey:
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: /discord/discordApiBotPublicKey
+    Description: The public key for your Discord bot.
+  SlashBotAppId:
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: /discord/slashBotAppId
+    Description: The Application ID for your discord bot.
+  Route53HostedZone:
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: /globals/supergoonRoute53HostedZoneId
+    Description: The route53 hosted zone where your record will be created.
+  GetValuesFromTableLambdaName:
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: /jrpg/getVoteValuesLambdaArn
+    Description: The function to get values from the DynamoDB table.
 
 Resources:
-  HelloWorldFunction:
-    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+  DiscordApiGateway:
+    Type: AWS::Serverless::Api
     Properties:
-      PackageType: Image
-      Architectures:
-        - x86_64
-      Events:
-        HelloWorld:
-          Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
-          Properties:
-            Path: /hello
-            Method: get
-    Metadata:
-      Dockerfile: Dockerfile
-      DockerContext: ./hello_world
-      DockerTag: python3.9-v1
+      Name: DiscordApiGateway
+      StageName: Prod
+      Description: "The discord front end that discord will reach out to for authentication and when looking for bot responses."
+      Domain: 
+        CertificateArn: !Ref CertificateArn
+        DomainName: !Ref ApiDomainName
+        Route53:
+          HostedZoneId: !Ref Route53HostedZone
+          EvaluateTargetHealth: true
+
   DiscordSlashBot:
     Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
     Properties:
       PackageType: Image
       Architectures:
         - x86_64
+      Environment:
+        Variables:
+          BOTPUBLICKEY: !Ref SlashBotPublicKey
+          COMMANDAPIARN: !Ref DiscordSlashBotCommands
       Events:
-        HelloWorld:
+        ApiPost:
           Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
           Properties:
             Path: /api
             Method: post
+            RestApiId:
+              Ref: DiscordApiGateway
+      Policies: 
+        - LambdaInvokePolicy:
+            FunctionName: !Ref DiscordSlashBotCommands
     Metadata:
       Dockerfile: Dockerfile
       DockerContext: ./slashbotLambda
       DockerTag: python3.9-v1
+  DiscordSlashBotCommands:
+    Type: AWS::Serverless::Function
+    Properties:
+      PackageType: Image
+      Architectures:
+        - x86_64
+      Environment:
+        Variables:
+          GETVOTESLAMBDAARN: !Ref GetValuesFromTableLambdaName
+          SLASHBOTAPPID: !Ref SlashBotAppId
+      Policies:
+        - LambdaInvokePolicy:
+            FunctionName: !Ref GetValuesFromTableLambdaName
+    Metadata:
+      Dockerfile: Dockerfile
+      DockerContext: ./slashbotCommandsLambda
+      DockerTag: python3.9-v1
 
 Outputs:
-  # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
-  # Find out more about other implicit resources you can reference within SAM
-  # https://github.com/awslabs/serverless-application-model/blob/master/docs/internals/generated_resources.rst#api
-  HelloWorldApi:
-    Description: "API Gateway endpoint URL for Prod stage for Hello World function"
-    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/hello/"
-  HelloWorldFunction:
-    Description: "Hello World Lambda Function ARN"
-    Value: !GetAtt HelloWorldFunction.Arn
-  HelloWorldFunctionIamRole:
-    Description: "Implicit IAM Role created for Hello World function"
-    Value: !GetAtt HelloWorldFunctionRole.Arn
+  DiscordApiEndpoint:
+    Description: "API Gateway endpoint URL for Prod stage without the r53 record"
+    Value: !Sub "https://${DiscordApiGateway}.execute-api.${AWS::Region}.amazonaws.com/Prod/api/"
