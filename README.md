@@ -7,7 +7,7 @@ This is an API that works with a discord bot to receive slash commands and respo
 
 **By using a API gateway that is billed only on usage, and lambda which is billed only on usage, this allows us to have a bot without any hardware, and with minimal costs per month (*pennies*)**
 
-This bot has a command that it responds to with a simple hello world, and a command that 
+This bot has a command that it responds to with a simple hello world, and a command that calls into a dynamo DB with another lambda function to get some values.  These values are updated in-game from a Unity project.
 
 This discord bot is build in two parts:
 * **Front end Lambda**: This lambda function handles Discords authentication requests and pings.  It needs to respond within 3 seconds or else discord will consider it failed.  It is quite easy to fall into the 3 seconds as the cold start times on Lambda functions can add up if you are invoking multiple lambdas like we couuld possibly do.  After the request is verified, it will tell the discord bot to "wait" and send it into a thinking state until we update the response from the command handler.
