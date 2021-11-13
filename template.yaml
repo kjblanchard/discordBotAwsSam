@@ -27,6 +27,22 @@ Resources:
       Dockerfile: Dockerfile
       DockerContext: ./hello_world
       DockerTag: python3.9-v1
+  DiscordSlashBot:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Properties:
+      PackageType: Image
+      Architectures:
+        - x86_64
+      Events:
+        HelloWorld:
+          Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
+          Properties:
+            Path: /api
+            Method: post
+    Metadata:
+      Dockerfile: Dockerfile
+      DockerContext: ./slashbotLambda
+      DockerTag: python3.9-v1
 
 Outputs:
   # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function

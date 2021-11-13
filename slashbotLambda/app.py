@@ -2,6 +2,7 @@ import json
 import boto3
 import logging
 from nacl.signing import VerifyKey
+from nacl.exceptions import BadSignatureError
 
 publicKeySSMName = '/discord/discordApiBotPublicKey'
 commandApiArnSSMName = '/discord/discordCommandLambdaArn'
@@ -23,24 +24,44 @@ def lambda_handler(event, context):
       [json]: Returns a type 5 response; to discord this means "I acknowledge your message, and will send a response later".
   """
   logger.info('## EVENT')
-  logger.info(event)
+  logger.info('##NOEVENT')
+  # logger.info(event)
 
   (apiBotPublicKey,commandsApiArn) = GetSSMParams()
 
   try:
     VerifySignature(event, apiBotPublicKey)
+  except BadSignatureError:
+      return {
+        'statusCode': 401,
+        'body': json.dumps('invalid request signature')
+      }
   except Exception as e:
     raise Exception(f"Unverified, there was an issue verifying the signature. {e}")
   
   if(HandleDiscordPing(event)):
-    return {"type": 1}
-
-  response =   {"type": 5}
+    return {
+        'statusCode': 200,
+        'body': json.dumps({
+          'type': 1
+        })
+      }
+    # return {"type": 1}
+  response =     {
+      'statusCode': 200,
+      'body': json.dumps({
+        'type': 4,
+        'data': {
+          'content': 'Hello, World.',
+        }
+      })
+    }
+  # response =   {"type": 5}
 
   logger.info('## RESPONSE')
   logger.info(response)
 
-  lambdaData = json.dumps(event.get('body-json'))
+  lambdaData = json.dumps(event.get('body'))
   InvokeDiscordCommandsApi(lambdaData, commandsApiArn)
   return response
 
@@ -68,7 +89,7 @@ def HandleDiscordPing(body):
     Returns:
         bool: True if it is a ping, false if it isnt.
     """
-    if body.get("body-json").get("type") == 1:
+    if json.loads(body.get("body")).get("type") == 1:
         return True
     return False
 
@@ -81,12 +102,17 @@ def VerifySignature(event, botPublicKey):
 
       botPublicKey (string): The front end bots public key so that we can verify the signature with it.
   """
-  signature = event['params']['header']['x-signature-ed25519']
-  timestamp = event['params']['header']['x-signature-timestamp']
-  raw_body = event.get("rawBody")
-  message = timestamp.encode() + raw_body.encode()
+  signature = event['headers']['x-signature-ed25519']
+  timestamp = event['headers']['x-signature-timestamp']
+  body = event['body']
+  message = timestamp.encode() + body.encode()
   verify_key = VerifyKey(bytes.fromhex(botPublicKey))
+  logger.info(verify_key)
   verify_key.verify(message, bytes.fromhex(signature))
+  # raw_body = json.dumps(event)
+  # message = timestamp.encode() + raw_body.encode()
+  # verify_key = VerifyKey(bytes.fromhex(botPublicKey))
+  # verify_key.verify(message, bytes.fromhex(signature))
 
 def GetSSMParams():
   """Gets the SSM parameters from the store and returns them.
