@@ -1,7 +1,6 @@
 # Discord Bot in AWS Serverless model - SAM
 
-![Picture didn't load idiot](https://github.com/kjblanchard/
-discordBotAwsSam/blob/master/demo.gif?raw=true)
+![Picture didn't load idiot](https://github.com/kjblanchard/discordBotAwsSam/blob/master/demo.gif?raw=true)
 
 ## Description
 This is an API that works with a discord bot to receive slash commands and respond to them. SAM allows us to test locally while in development, and group everything into a nice cloudformation stack.  It accomplishes this by building the lambdas into docker images and uploads them to ECR when deploying.  
