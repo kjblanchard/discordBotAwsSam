@@ -12,7 +12,8 @@ commandsApiArn = os.environ['COMMANDAPIARN']
 
 
 def lambda_handler(event, context):
-    """This lambda function handles Discord authentication requests from them.  It verifies their key, and responds to ping and Interactions from our bot.  Discord has a limitation that we must respond in 3 seconds, due to this if it is a command we will pass back a temporary value so that our bot "thinks about it" and then the command backend will update it.
+    """This lambda function handles Discord authentication requests from them.  It verifies their key, and responds to ping and Interactions from our bot.  
+    Discord has a limitation that we must respond in 3 seconds, due to this if it is a command we will pass back a temporary value so that our bot "thinks about it" and then the command backend will update it.
 
 
     Args:
