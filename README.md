@@ -21,9 +21,15 @@ The [template.yaml](template.yaml) file holds the SAM definition.  It's an exten
 * **A bunch of SSM parameters** Most of the critical information is passed into the SSM parameters inside of the [template.yaml](template.yaml) file in the parameters section.  All of the params are needed and referenced by the lambda functions.
 * **A discord application with a bot** Look up on discord developer how to do that
 * **Registering the slash commands you want** After you create this *or before* you need to register some commands by using post calls to the discord servers for which slash commands.  This is documented on discord developer as well.
+* **AWS cli configured with proper credentials, AWS SAM cli, Python3, and Docker**
 
-## Pictures
-
+## Usage
+* **Make sure that you have all the requirements and know what you are doing (*admittedly I failed at this many times*)**: Self explanitory, this is complex.
+* **Run sam init**: Sam init creates your template file, generates a s3 bucket to store it in, and gets all of your parameters.
+* **Clone the repo**: Pulls in all the functions that you need and the cfn template.
+* **Run sam build**: Builds the docker images locally
+* **Optional: test locally with sam local start-api**: Wow
+* **Run sam deploy to deploy a cloudformation stack**: Pushes your docker images to ecr and creates your stack.
 
 # AWS SAM documentation
 
