@@ -1,13 +1,32 @@
-# sam-app
+# Discord Bot in AWS Serverless model - SAM
 
-This project contains source code and supporting files for a serverless application that you can deploy with the SAM CLI. It includes the following files and folders.
+![Picture didn't load idiot](https://github.com/kjblanchard/
+discordBotAwsSam/blob/master/demo.gif?raw=true)
 
-- hello_world - Code for the application's Lambda function and Project Dockerfile.
-- events - Invocation events that you can use to invoke the function.
-- tests - Unit tests for the application code. 
-- template.yaml - A template that defines the application's AWS resources.
+## Description
+This is an API that works with a discord bot to receive slash commands and respond to them. SAM allows us to test locally while in development, and group everything into a nice cloudformation stack.  It accomplishes this by building the lambdas into docker images and uploads them to ECR when deploying.  
 
-The application uses several AWS resources, including Lambda functions and an API Gateway API. These resources are defined in the `template.yaml` file in this project. You can update the template to add AWS resources through the same deployment process that updates your application code.
+**By using a API gateway that is billed only on usage, and lambda which is billed only on usage, this allows us to have a bot without any hardware, and with minimal costs per month (*pennies*)**
+
+This bot has a command that it responds to with a simple hello world, and a command that 
+
+This discord bot is build in two parts:
+* **Front end Lambda**: This lambda function handles Discords authentication requests and pings.  It needs to respond within 3 seconds or else discord will consider it failed.  It is quite easy to fall into the 3 seconds as the cold start times on Lambda functions can add up if you are invoking multiple lambdas like we couuld possibly do.  After the request is verified, it will tell the discord bot to "wait" and send it into a thinking state until we update the response from the command handler.
+* **Command Handler**: This lambda function will handle all of our different commands, and update the interaction from the front ends event.
+
+The [template.yaml](template.yaml) file holds the SAM definition.  It's an extension to cloudformation and most cfn will work with it.
+
+## Requirements
+* **Route 53 domain**: You need a route 53 domain to use the domain section of the api.  You will need to remove that section if you don't
+* **Root certificate** You will need a * cert that you can use for your api's front end in the correct region in AWS certificate manager.
+* **A bunch of SSM parameters** Most of the critical information is passed into the SSM parameters inside of the [template.yaml](template.yaml) file in the parameters section.  All of the params are needed and referenced by the lambda functions.
+* **A discord application with a bot** Look up on discord developer how to do that
+* **Registering the slash commands you want** After you create this *or before* you need to register some commands by using post calls to the discord servers for which slash commands.  This is documented on discord developer as well.
+
+## Pictures
+
+
+# AWS SAM documentation
 
 ## Deploy the sample application
 
